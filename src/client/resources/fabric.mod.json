@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "id": "timite-tracker",
+  "version": "${version}",
+  "name": "Timite Tracker",
+  "description": "Trackt deine Timite-Collection (Hypixel Skyblock Rift), vergleicht sie mit dem #1 und berechnet das Tagesziel.",
+  "environment": "client",
+  "entrypoints": { "client": ["de.timitetracker.TimiteTrackerClient"] },
+  "depends": {
+    "fabricloader": ">=0.20.1",
+    "minecraft": "~26.2",
+    "java": ">=25",
+    "fabric-api": "*"
+  }
+}
