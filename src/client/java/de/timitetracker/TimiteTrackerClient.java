@@ -2,7 +2,7 @@ package de.timitetracker;
 
 import com.mojang.brigadier.Command;
 import net.fabricmc.api.ClientModInitializer;
-import net.fabricmc.fabric.api.client.command.v2.ClientCommandManager;
+import net.fabricmc.fabric.api.client.command.v2.ClientCommands;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
@@ -19,7 +19,7 @@ public class TimiteTrackerClient implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) ->
-            dispatcher.register(ClientCommandManager.literal("timite").executes(ctx -> {
+            dispatcher.register(ClientCommands.literal("timite").executes(ctx -> {
                 refresh();
                 return Command.SINGLE_SUCCESS;
             })));
@@ -27,7 +27,7 @@ public class TimiteTrackerClient implements ClientModInitializer {
 
     private static void say(Component c) {
         Minecraft mc = Minecraft.getInstance();
-        mc.execute(() -> { if (mc.player != null) mc.player.displayClientMessage(c, false); });
+        mc.execute(() -> mc.gui.getChat().addMessage(c));
     }
     private static Component line(String label, String value, ChatFormatting color) {
         return Component.literal(label).withStyle(ChatFormatting.GRAY)
