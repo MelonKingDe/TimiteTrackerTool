@@ -4,6 +4,7 @@ import com.mojang.brigadier.Command;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommands;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
+import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
 import net.minecraft.ChatFormatting;
@@ -15,11 +16,13 @@ import java.util.concurrent.CompletableFuture;
 
 public class TimiteTrackerClient implements ClientModInitializer {
     private static final String TARGET_IGN = "dinofeet_";
+    private static volatile FabricClientCommandSource source;
 
     @Override
     public void onInitializeClient() {
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) ->
             dispatcher.register(ClientCommands.literal("timite").executes(ctx -> {
+                source = ctx.getSource();
                 refresh();
                 return Command.SINGLE_SUCCESS;
             })));
@@ -27,7 +30,8 @@ public class TimiteTrackerClient implements ClientModInitializer {
 
     private static void say(Component c) {
         Minecraft mc = Minecraft.getInstance();
-        mc.execute(() -> mc.gui.getChat().addMessage(c));
+        FabricClientCommandSource src = source;
+        if (src != null) mc.execute(() -> src.sendFeedback(c));
     }
     private static Component line(String label, String value, ChatFormatting color) {
         return Component.literal(label).withStyle(ChatFormatting.GRAY)
