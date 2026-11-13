@@ -1,20 +1,23 @@
 # Timite Tracker (Fabric 26.2)
 
-Client-Mod für Hypixel Skyblock. Befehl: `/timite`
+Client-side mod for Hypixel Skyblock. Shows a permanent HUD (top-left) with:
+- your Timite collection and rank
+- the collection of dinofeet_ (or the current #1 if dinofeet_ is not in the top 100)
+- the gap, and how much you need to collect per day to be #1 before 2027
+  (once assuming the #1 stands still, once using the #1's measured pace)
 
-Zeigt: deine Timite-Collection, die von dinofeet_ (bzw. dem aktuellen #1), den Abstand
-und wie viel du pro Tag sammeln musst, um bis 01.01.2027 #1 zu sein
-(einmal wenn der #1 stehen bleibt, einmal mit seinem gemessenen Tempo).
+Live counting: every Youngite, Timite or Obsolite you pick up (or mine) is added to your count immediately
+(+1 each). When Elite's data catches up, the live bonus is reduced accordingly. Moving items in chests or
+your inventory screen is not counted.
 
-## Bauen mit GitHub Actions
-1. Auf https://fabricmc.net/develop/ die Versionen für 26.2 nachschauen und in `gradle.properties`
-   eintragen (`loader_version`, `loom_version`, `fabric_api_version`).
-2. Repo pushen -> Workflow *Build* läuft automatisch, die Jar steht unter Actions -> Artifacts.
-3. Release: `git tag v1.0.0 && git push origin v1.0.0` -> Jar wird automatisch an ein GitHub-Release gehängt.
+Commands: `/timite` refreshes now, `/timite toggle` shows/hides the HUD.
+The HUD refreshes automatically every 5 minutes.
 
-Lokal: Java 25 + Gradle, dann `gradle build` (Jar in `build/libs/`).
+## Build with GitHub Actions
+Push the repo, the *Build* workflow runs and the jar appears under Actions -> Artifacts.
+Release: `git tag v1.0.0 && git push origin v1.0.0`.
 
-## Hinweise
-- Daten kommen von api.eliteskyblock.com (Leaderboard-ID wird zur Laufzeit über /leaderboards gefunden).
-- Das Tempo des #1 wird aus lokalen Messpunkten (config/timite-tracker-history.json) berechnet.
-  Je öfter du `/timite` über mehrere Tage nutzt, desto genauer.
+## Notes
+- Data comes from api.eliteskyblock.com (the Timite leaderboard id is found at runtime via /leaderboards).
+- The #1's pace is calculated from local measurements (config/timite-tracker-history.json);
+  it needs about 12 hours of data to appear.

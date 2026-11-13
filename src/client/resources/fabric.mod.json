@@ -3,7 +3,7 @@
   "id": "timite-tracker",
   "version": "${version}",
   "name": "Timite Tracker",
-  "description": "Trackt deine Timite-Collection (Hypixel Skyblock Rift), vergleicht sie mit dem #1 und berechnet das Tagesziel.",
+  "description": "HUD that tracks your Timite collection (Hypixel Skyblock Rift), compares it with the #1 player and shows the daily target.",
   "environment": "client",
   "entrypoints": { "client": ["de.timitetracker.TimiteTrackerClient"] },
   "depends": {
