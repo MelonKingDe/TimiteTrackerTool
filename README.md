@@ -3,15 +3,14 @@
 Client-side mod for Hypixel Skyblock. Shows a permanent HUD (top-left) with:
 - your Timite collection and rank
 - the collection of dinofeet_ (or the current #1 if dinofeet_ is not in the top 100)
-- the gap, and how much you need to collect per day to be #1 before 2027
-  (once assuming the #1 stands still, once using the #1's measured pace)
+- the gap, and how much you need to collect per day to be #1 before 2027 (assuming the #1 stands still)
 
 Live counting: every Youngite, Timite or Obsolite you pick up (or mine) is added to your count immediately
 (+1 each). When Elite's data catches up, the live bonus is reduced accordingly. Moving items in chests or
 your inventory screen is not counted.
 
 ## Config / moving the HUD
-Config file: `.minecraft/config/timite-tracker.json` (x, y, backgroundOpacity, visible, showProgressBar, showPace, showUpdated, accentColor).
+Config file: `.minecraft/config/timite-tracker.json` (x, y, backgroundOpacity, visible, showProgressBar, showUpdated, accentColor).
 
 | Command | Effect |
 |---|---|
@@ -30,5 +29,3 @@ Release: `git tag v1.0.0 && git push origin v1.0.0`.
 
 ## Notes
 - Data comes from api.eliteskyblock.com (the Timite leaderboard id is found at runtime via /leaderboards).
-- The #1's pace is calculated from local measurements (config/timite-tracker-history.json);
-  it needs about 12 hours of data to appear.

@@ -21,7 +21,6 @@ public final class HudConfig {
     public int backgroundOpacity = 70;
     public boolean visible = true;
     public boolean showProgressBar = true;
-    public boolean showPace = true;
     public boolean showUpdated = true;
     /** Accent color (RGB hex without alpha) used for the left bar and progress bar. */
     public String accentColor = "FFAA00";

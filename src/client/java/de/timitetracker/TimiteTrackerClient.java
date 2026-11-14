@@ -22,8 +22,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -32,22 +30,20 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class TimiteTrackerClient implements ClientModInitializer {
     private static final String TARGET_IGN = "dinofeet_";
     private static final long REFRESH_MS = 5 * 60 * 1000L;
-    private static final int HUD_X = 4, HUD_Y = 4;
     /** Every pickup of one of these items counts +1 to the Timite collection. */
     private static final String[] COUNTED_ITEMS = {"youngite", "timite", "obsolite"};
     private static final Path LOCAL_FILE = FabricLoader.getInstance().getConfigDir().resolve("timite-tracker-local.json");
 
     /** Last data fetched from the API. */
-    private record Data(double mineApi, int mineRank, EliteApi.Entry target, boolean targetFound, Double leaderRate) {}
+    private record Data(double mineApi, int mineRank, EliteApi.Entry target, boolean targetFound) {}
+
+    /** Everything the HUD needs to draw (pre-formatted). status != null -> loading/error screen. */
+    record View(String status, boolean error, int rank, String you, String targetName, String targetVal,
+                        boolean lead, String gap, String need, String days, double progress, String note, String updated) {}
 
     private static volatile Data data;
     private static volatile String error;
-    /** One HUD row: label on the left, value right-aligned. A null value = plain full-width text. */
-    private record Row(Component label, Component value) {}
-    private record View(List<Row> rows, double progress) {}
-
-    private static volatile View view = new View(
-            List.of(new Row(Component.literal("Loading...").withStyle(ChatFormatting.GRAY), null)), -1);
+    private static volatile View view = new View("Loading...", false, 0, "", "", "", false, "", "", "", -1, null, "");
     private static final AtomicBoolean loading = new AtomicBoolean(false);
     private static long lastRefresh = 0;
 
@@ -65,34 +61,9 @@ public class TimiteTrackerClient implements ClientModInitializer {
             HudConfig cfg = HudConfig.get();
             if (!cfg.visible) return;
             Minecraft mc = Minecraft.getInstance();
-            View v = view;
-
-            final int pad = 5, barW = 2, rowH = mc.font.lineHeight + 2, gap = 12;
-            // width = widest row
-            int inner = 90;
-            for (Row r : v.rows())
-                inner = Math.max(inner, mc.font.width(r.label()) + (r.value() == null ? 0 : gap + mc.font.width(r.value())));
-            int w = pad + barW + pad + inner + pad;
-            boolean bar = cfg.showProgressBar && v.progress() >= 0;
-            int h = pad * 2 + v.rows().size() * rowH + (bar ? 9 : 0) - 2;
-
-            int x = cfg.x, y = cfg.y;
-            graphics.fill(x, y, x + w, y + h, cfg.backgroundArgb());          // panel
-            graphics.fill(x, y, x + barW, y + h, cfg.accentArgb());           // accent bar
-
-            int tx = x + barW + pad, ty = y + pad;
-            for (Row r : v.rows()) {
-                graphics.text(mc.font, r.label(), tx, ty, 0xFFFFFFFF);
-                if (r.value() != null)
-                    graphics.text(mc.font, r.value(), tx + inner - mc.font.width(r.value()), ty, 0xFFFFFFFF);
-                ty += rowH;
-            }
-            if (bar) {
-                int by = ty + 1, bw = inner;
-                graphics.fill(tx, by, tx + bw, by + 3, 0x33FFFFFF);   // track
-                int filled = (int) Math.round(bw * Math.min(1.0, Math.max(0.0, v.progress())));
-                graphics.fill(tx, by, tx + filled, by + 3, cfg.accentArgb());                   // fill
-            }
+            HudRenderer.draw(mc, cfg, view,
+                    (x1, y1, x2, y2, c) -> graphics.fill(x1, y1, x2, y2, c),
+                    (comp, x, y, color) -> graphics.text(mc.font, comp, x, y, color));
         });
 
         ClientTickEvents.END_CLIENT_TICK.register(mc -> {
@@ -210,11 +181,8 @@ public class TimiteTrackerClient implements ClientModInitializer {
                 String lb = EliteApi.findTimiteLeaderboardId();
                 EliteApi.Entry mine = EliteApi.me(lb, me);
                 EliteApi.Entry target = EliteApi.findInTop(lb, TARGET_IGN, 100);
-                EliteApi.Entry top = EliteApi.top1(lb);
                 boolean found = target != null;
-                if (!found) target = top;
-
-                List<History.Point> hist = History.add(top.amount());
+                if (!found) target = EliteApi.top1(lb);
 
                 // If the API value grew, it has (partly) caught up with our local pickups
                 if (lastApiAmount >= 0 && mine.amount() > lastApiAmount) {
@@ -224,7 +192,7 @@ public class TimiteTrackerClient implements ClientModInitializer {
                 lastApiAmount = mine.amount();
                 saveLocal();
 
-                data = new Data(mine.amount(), mine.rank(), target, found, History.leaderRatePerDay(hist));
+                data = new Data(mine.amount(), mine.rank(), target, found);
                 error = null;
             } catch (Exception e) {
                 error = e.getMessage();
@@ -237,63 +205,30 @@ public class TimiteTrackerClient implements ClientModInitializer {
 
     // ---------- HUD content ----------
 
-    private static Row row(String label, String value, ChatFormatting valueColor) {
-        return new Row(Component.literal(label).withStyle(ChatFormatting.GRAY),
-                Component.literal(value).withStyle(valueColor));
-    }
     private static String fmt(double d) { return String.format(Locale.US, "%,.0f", d); }
 
     private static void rebuild() {
-        HudConfig cfg = HudConfig.get();
-        List<Row> rows = new ArrayList<>();
         Data d = data;
-
-        Component title = Component.literal("TIMITE").withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD);
         if (d == null) {
-            rows.add(new Row(title, null));
-            rows.add(new Row(Component.literal(error != null ? "Error: " + error : "Loading...")
-                    .withStyle(error != null ? ChatFormatting.RED : ChatFormatting.GRAY), null));
-            view = new View(rows, -1);
+            view = new View(error != null ? "Error: " + error : "Loading...", error != null,
+                    0, "", "", "", false, "", "", "", -1, null, "");
             return;
         }
-
         double mine = d.mineApi() + localBonus;
         EliteApi.Entry target = d.target();
         double gap = target.amount() - mine;
         Instant deadline = LocalDate.of(2027, 1, 1).atStartOfDay(ZoneId.systemDefault()).toInstant();
         double daysLeft = Math.max(0.01, Duration.between(Instant.now(), deadline).toSeconds() / 86400.0);
 
-        rows.add(new Row(title, Component.literal("#" + d.mineRank()).withStyle(ChatFormatting.GREEN)));
-        String bonus = localBonus > 0 ? " (+" + localBonus + ")" : "";
-        rows.add(row("You", fmt(mine) + bonus, ChatFormatting.GREEN));
-        rows.add(row(target.ign(), fmt(target.amount()), ChatFormatting.RED));
-        if (!d.targetFound())
-            rows.add(new Row(Component.literal(TARGET_IGN + " not in top 100").withStyle(ChatFormatting.YELLOW), null));
-
-        if (gap <= 0) {
-            rows.add(row("Lead", "+" + fmt(-gap), ChatFormatting.AQUA));
-        } else {
-            rows.add(row("Gap", fmt(gap), ChatFormatting.YELLOW));
-            rows.add(row("Days left", String.format(Locale.US, "%.1f", daysLeft), ChatFormatting.WHITE));
-            rows.add(row("Need / day", fmt(Math.ceil(gap / daysLeft)), ChatFormatting.AQUA));
-            if (cfg.showPace) {
-                Double rate = d.leaderRate();
-                if (rate != null) {
-                    rows.add(row("#1 pace", fmt(rate) + "/day", ChatFormatting.RED));
-                    rows.add(row("Need / day vs #1", fmt(Math.ceil((gap + rate * daysLeft) / daysLeft)), ChatFormatting.AQUA));
-                } else {
-                    rows.add(new Row(Component.literal("#1 pace: collecting data...").withStyle(ChatFormatting.DARK_GRAY), null));
-                }
-            }
-        }
+        String you = fmt(mine) + (localBonus > 0 ? " (+" + localBonus + ")" : "");
         double progress = target.amount() > 0 ? Math.min(1.0, mine / target.amount()) : -1;
-        if (progress >= 0)
-            rows.add(row("Progress", String.format(Locale.US, "%.2f%%", progress * 100), ChatFormatting.WHITE));
-        if (error != null)
-            rows.add(new Row(Component.literal("Update failed").withStyle(ChatFormatting.RED), null));
-        else if (cfg.showUpdated)
-            rows.add(new Row(Component.literal("Updated " + LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm")))
-                    .withStyle(ChatFormatting.DARK_GRAY), null));
-        view = new View(rows, progress);
+        String note = d.targetFound() ? null : TARGET_IGN + " not in top 100, showing #1";
+        String updated = error != null ? "Update failed"
+                : "Updated " + LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm"));
+
+        view = new View(null, false, d.mineRank(), you, target.ign(), fmt(target.amount()),
+                gap <= 0, gap <= 0 ? "+" + fmt(-gap) : fmt(gap),
+                gap <= 0 ? "-" : fmt(Math.ceil(gap / daysLeft)),
+                String.format(Locale.US, "%.1f", daysLeft), progress, note, updated);
     }
 }
