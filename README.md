@@ -10,7 +10,18 @@ Live counting: every Youngite, Timite or Obsolite you pick up (or mine) is added
 (+1 each). When Elite's data catches up, the live bonus is reduced accordingly. Moving items in chests or
 your inventory screen is not counted.
 
-Commands: `/timite` refreshes now, `/timite toggle` shows/hides the HUD.
+## Config / moving the HUD
+Config file: `.minecraft/config/timite-tracker.json` (x, y, backgroundOpacity, visible, showProgressBar, showPace, showUpdated, accentColor).
+
+| Command | Effect |
+|---|---|
+| `/timite` | refresh now |
+| `/timite pos <x> <y>` | move the HUD (GUI pixels from top-left) |
+| `/timite bg <0-100>` | background opacity |
+| `/timite toggle` | show / hide |
+| `/timite reload` | reload the config file after editing it |
+| `/timite reset` | back to defaults |
+
 The HUD refreshes automatically every 5 minutes.
 
 ## Build with GitHub Actions

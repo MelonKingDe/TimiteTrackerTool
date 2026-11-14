@@ -3,6 +3,7 @@ package de.timitetracker;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.mojang.brigadier.Command;
+import com.mojang.brigadier.arguments.IntegerArgumentType;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommands;
@@ -41,9 +42,12 @@ public class TimiteTrackerClient implements ClientModInitializer {
 
     private static volatile Data data;
     private static volatile String error;
-    private static volatile List<Component> lines = List.of(
-            Component.literal("Timite: loading...").withStyle(ChatFormatting.GRAY));
-    private static volatile boolean hudVisible = true;
+    /** One HUD row: label on the left, value right-aligned. A null value = plain full-width text. */
+    private record Row(Component label, Component value) {}
+    private record View(List<Row> rows, double progress) {}
+
+    private static volatile View view = new View(
+            List.of(new Row(Component.literal("Loading...").withStyle(ChatFormatting.GRAY), null)), -1);
     private static final AtomicBoolean loading = new AtomicBoolean(false);
     private static long lastRefresh = 0;
 
@@ -54,15 +58,40 @@ public class TimiteTrackerClient implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
+        HudConfig.load();
         loadLocal();
 
         HudElementRegistry.addLast(Identifier.fromNamespaceAndPath("timite-tracker", "hud"), (graphics, tickCounter) -> {
-            if (!hudVisible) return;
+            HudConfig cfg = HudConfig.get();
+            if (!cfg.visible) return;
             Minecraft mc = Minecraft.getInstance();
-            int y = HUD_Y;
-            for (Component line : lines) {
-                graphics.text(mc.font, line, HUD_X, y, 0xFFFFFFFF);
-                y += mc.font.lineHeight + 2;
+            View v = view;
+
+            final int pad = 5, barW = 2, rowH = mc.font.lineHeight + 2, gap = 12;
+            // width = widest row
+            int inner = 90;
+            for (Row r : v.rows())
+                inner = Math.max(inner, mc.font.width(r.label()) + (r.value() == null ? 0 : gap + mc.font.width(r.value())));
+            int w = pad + barW + pad + inner + pad;
+            boolean bar = cfg.showProgressBar && v.progress() >= 0;
+            int h = pad * 2 + v.rows().size() * rowH + (bar ? 9 : 0) - 2;
+
+            int x = cfg.x, y = cfg.y;
+            graphics.fill(x, y, x + w, y + h, cfg.backgroundArgb());          // panel
+            graphics.fill(x, y, x + barW, y + h, cfg.accentArgb());           // accent bar
+
+            int tx = x + barW + pad, ty = y + pad;
+            for (Row r : v.rows()) {
+                graphics.text(mc.font, r.label(), tx, ty, 0xFFFFFFFF);
+                if (r.value() != null)
+                    graphics.text(mc.font, r.value(), tx + inner - mc.font.width(r.value()), ty, 0xFFFFFFFF);
+                ty += rowH;
+            }
+            if (bar) {
+                int by = ty + 1, bw = inner;
+                graphics.fill(tx, by, tx + bw, by + 3, 0x33FFFFFF);   // track
+                int filled = (int) Math.round(bw * Math.min(1.0, Math.max(0.0, v.progress())));
+                graphics.fill(tx, by, tx + filled, by + 3, cfg.accentArgb());                   // fill
             }
         });
 
@@ -85,8 +114,38 @@ public class TimiteTrackerClient implements ClientModInitializer {
                     return Command.SINGLE_SUCCESS;
                 })
                 .then(ClientCommands.literal("toggle").executes(ctx -> {
-                    hudVisible = !hudVisible;
-                    ctx.getSource().sendFeedback(Component.literal("Timite HUD " + (hudVisible ? "shown" : "hidden")));
+                    HudConfig c = HudConfig.get();
+                    c.visible = !c.visible;
+                    HudConfig.save();
+                    ctx.getSource().sendFeedback(Component.literal("Timite HUD " + (c.visible ? "shown" : "hidden")));
+                    return Command.SINGLE_SUCCESS;
+                }))
+                .then(ClientCommands.literal("pos")
+                    .then(ClientCommands.argument("x", IntegerArgumentType.integer(0))
+                        .then(ClientCommands.argument("y", IntegerArgumentType.integer(0)).executes(ctx -> {
+                            HudConfig c = HudConfig.get();
+                            c.x = IntegerArgumentType.getInteger(ctx, "x");
+                            c.y = IntegerArgumentType.getInteger(ctx, "y");
+                            HudConfig.save();
+                            ctx.getSource().sendFeedback(Component.literal("HUD position set to " + c.x + ", " + c.y));
+                            return Command.SINGLE_SUCCESS;
+                        }))))
+                .then(ClientCommands.literal("bg")
+                    .then(ClientCommands.argument("opacity", IntegerArgumentType.integer(0, 100)).executes(ctx -> {
+                        HudConfig c = HudConfig.get();
+                        c.backgroundOpacity = IntegerArgumentType.getInteger(ctx, "opacity");
+                        HudConfig.save();
+                        ctx.getSource().sendFeedback(Component.literal("HUD background opacity: " + c.backgroundOpacity + "%"));
+                        return Command.SINGLE_SUCCESS;
+                    })))
+                .then(ClientCommands.literal("reload").executes(ctx -> {
+                    HudConfig.load();
+                    ctx.getSource().sendFeedback(Component.literal("Timite config reloaded"));
+                    return Command.SINGLE_SUCCESS;
+                }))
+                .then(ClientCommands.literal("reset").executes(ctx -> {
+                    HudConfig.reset();
+                    ctx.getSource().sendFeedback(Component.literal("Timite HUD reset to defaults"));
                     return Command.SINGLE_SUCCESS;
                 }))));
     }
@@ -176,22 +235,25 @@ public class TimiteTrackerClient implements ClientModInitializer {
         });
     }
 
-    // ---------- HUD text ----------
+    // ---------- HUD content ----------
 
-    private static Component line(String label, String value, ChatFormatting color) {
-        return Component.literal(label).withStyle(ChatFormatting.GRAY)
-                .append(Component.literal(value).withStyle(color));
+    private static Row row(String label, String value, ChatFormatting valueColor) {
+        return new Row(Component.literal(label).withStyle(ChatFormatting.GRAY),
+                Component.literal(value).withStyle(valueColor));
     }
     private static String fmt(double d) { return String.format(Locale.US, "%,.0f", d); }
 
     private static void rebuild() {
-        List<Component> out = new ArrayList<>();
-        out.add(Component.literal("Timite Collection").withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD));
+        HudConfig cfg = HudConfig.get();
+        List<Row> rows = new ArrayList<>();
         Data d = data;
+
+        Component title = Component.literal("TIMITE").withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD);
         if (d == null) {
-            out.add(Component.literal(error != null ? "Error: " + error : "loading...")
-                    .withStyle(error != null ? ChatFormatting.RED : ChatFormatting.GRAY));
-            lines = out;
+            rows.add(new Row(title, null));
+            rows.add(new Row(Component.literal(error != null ? "Error: " + error : "Loading...")
+                    .withStyle(error != null ? ChatFormatting.RED : ChatFormatting.GRAY), null));
+            view = new View(rows, -1);
             return;
         }
 
@@ -201,32 +263,37 @@ public class TimiteTrackerClient implements ClientModInitializer {
         Instant deadline = LocalDate.of(2027, 1, 1).atStartOfDay(ZoneId.systemDefault()).toInstant();
         double daysLeft = Math.max(0.01, Duration.between(Instant.now(), deadline).toSeconds() / 86400.0);
 
-        String bonus = localBonus > 0 ? " (+" + localBonus + " live)" : "";
-        out.add(line("You: ", fmt(mine) + bonus + " (#" + d.mineRank() + ")", ChatFormatting.GREEN));
-        out.add(line(target.ign() + ": ", fmt(target.amount()) + " (#" + target.rank() + ")", ChatFormatting.RED));
+        rows.add(new Row(title, Component.literal("#" + d.mineRank()).withStyle(ChatFormatting.GREEN)));
+        String bonus = localBonus > 0 ? " (+" + localBonus + ")" : "";
+        rows.add(row("You", fmt(mine) + bonus, ChatFormatting.GREEN));
+        rows.add(row(target.ign(), fmt(target.amount()), ChatFormatting.RED));
         if (!d.targetFound())
-            out.add(Component.literal(TARGET_IGN + " not in top 100, showing #1").withStyle(ChatFormatting.YELLOW));
+            rows.add(new Row(Component.literal(TARGET_IGN + " not in top 100").withStyle(ChatFormatting.YELLOW), null));
 
         if (gap <= 0) {
-            out.add(line("Lead: ", "+" + fmt(-gap), ChatFormatting.AQUA));
+            rows.add(row("Lead", "+" + fmt(-gap), ChatFormatting.AQUA));
         } else {
-            out.add(line("Gap: ", fmt(gap), ChatFormatting.YELLOW));
-            out.add(line("Days until 2027: ", String.format(Locale.US, "%.1f", daysLeft), ChatFormatting.WHITE));
-            out.add(line("Need/day: ", fmt(Math.ceil(gap / daysLeft)), ChatFormatting.AQUA));
-            Double rate = d.leaderRate();
-            if (rate != null) {
-                double need = (gap + rate * daysLeft) / daysLeft;
-                out.add(line("#1 pace: ", fmt(rate) + "/day", ChatFormatting.RED));
-                out.add(line("Need/day (vs pace): ", fmt(Math.ceil(need)), ChatFormatting.AQUA));
-            } else {
-                out.add(Component.literal("#1 pace: collecting data...").withStyle(ChatFormatting.DARK_GRAY));
+            rows.add(row("Gap", fmt(gap), ChatFormatting.YELLOW));
+            rows.add(row("Days left", String.format(Locale.US, "%.1f", daysLeft), ChatFormatting.WHITE));
+            rows.add(row("Need / day", fmt(Math.ceil(gap / daysLeft)), ChatFormatting.AQUA));
+            if (cfg.showPace) {
+                Double rate = d.leaderRate();
+                if (rate != null) {
+                    rows.add(row("#1 pace", fmt(rate) + "/day", ChatFormatting.RED));
+                    rows.add(row("Need / day vs #1", fmt(Math.ceil((gap + rate * daysLeft) / daysLeft)), ChatFormatting.AQUA));
+                } else {
+                    rows.add(new Row(Component.literal("#1 pace: collecting data...").withStyle(ChatFormatting.DARK_GRAY), null));
+                }
             }
         }
+        double progress = target.amount() > 0 ? Math.min(1.0, mine / target.amount()) : -1;
+        if (progress >= 0)
+            rows.add(row("Progress", String.format(Locale.US, "%.2f%%", progress * 100), ChatFormatting.WHITE));
         if (error != null)
-            out.add(Component.literal("Update failed: " + error).withStyle(ChatFormatting.RED));
-        else
-            out.add(Component.literal("Updated " + LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm")))
-                    .withStyle(ChatFormatting.DARK_GRAY));
-        lines = out;
+            rows.add(new Row(Component.literal("Update failed").withStyle(ChatFormatting.RED), null));
+        else if (cfg.showUpdated)
+            rows.add(new Row(Component.literal("Updated " + LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm")))
+                    .withStyle(ChatFormatting.DARK_GRAY), null));
+        view = new View(rows, progress);
     }
 }
