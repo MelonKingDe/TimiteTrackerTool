@@ -14,6 +14,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 
 import java.nio.file.Files;
@@ -60,7 +61,7 @@ public class TimiteTrackerClient implements ClientModInitializer {
             Minecraft mc = Minecraft.getInstance();
             int y = HUD_Y;
             for (Component line : lines) {
-                graphics.drawString(mc.font, line, HUD_X, y, 0xFFFFFFFF);
+                graphics.text(mc.font, line, HUD_X, y, 0xFFFFFFFF);
                 y += mc.font.lineHeight + 2;
             }
         });
@@ -92,23 +93,26 @@ public class TimiteTrackerClient implements ClientModInitializer {
 
     // ---------- live pickup tracking (inventory diff) ----------
 
-    private static int countItems(Inventory inv) {
-        int total = 0;
-        for (int i = 0; i < inv.getContainerSize(); i++) {
-            ItemStack st = inv.getItem(i);
-            if (st.isEmpty()) continue;
-            String name = st.getHoverName().getString().toLowerCase(Locale.ROOT);
-            for (String n : COUNTED_ITEMS) {
-                if (name.contains(n)) { total += st.getCount(); break; }
-            }
-        }
+    private static int countStack(ItemStack st) {
+        if (st.isEmpty()) return 0;
+        String name = st.getHoverName().getString().toLowerCase(Locale.ROOT);
+        for (String n : COUNTED_ITEMS) if (name.contains(n)) return st.getCount();
+        return 0;
+    }
+
+    /** Inventory + item held on the cursor, so moving items around never changes the total. */
+    private static int countItems(Player player) {
+        Inventory inv = player.getInventory();
+        int total = countStack(player.containerMenu.getCarried());
+        for (int i = 0; i < inv.getContainerSize(); i++) total += countStack(inv.getItem(i));
         return total;
     }
 
     private static void trackPickups(Minecraft mc) {
-        int cur = countItems(mc.player.getInventory());
-        // While a screen (chest, inventory, ...) is open, items are only being moved around -> don't count
-        if (mc.screen != null || invBaseline < 0) { invBaseline = cur; return; }
+        int cur = countItems(mc.player);
+        // While a chest/other container is open, items are only being moved around -> don't count
+        boolean containerOpen = mc.player.containerMenu != mc.player.inventoryMenu;
+        if (containerOpen || invBaseline < 0) { invBaseline = cur; return; }
         if (cur > invBaseline) {
             localBonus += cur - invBaseline;
             saveLocal();
