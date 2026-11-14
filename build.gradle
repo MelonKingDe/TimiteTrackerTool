@@ -13,7 +13,7 @@ repositories {}
 loom {
     splitEnvironmentSourceSets()
     mods {
-        "timite-tracker" {
+        "collection-tracker" {
             sourceSet sourceSets.client
         }
     }

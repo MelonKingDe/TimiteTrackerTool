@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
-  "id": "timite-tracker",
+  "id": "collection-tracker",
   "version": "${version}",
-  "name": "Timite Tracker",
-  "description": "HUD that tracks your Timite collection (Hypixel Skyblock Rift), compares it with the #1 player and shows the daily target.",
+  "name": "Collection Tracker",
+  "description": "HUD for Hypixel Skyblock: pick a collection, pick a rival and a deadline - see the gap and how much you need to collect per day.",
   "environment": "client",
-  "entrypoints": { "client": ["de.timitetracker.TimiteTrackerClient"] },
+  "entrypoints": { "client": ["de.collectiontracker.CollectionTrackerClient"] },
   "depends": {
     "fabricloader": ">=0.20.1",
     "minecraft": "~26.2",
