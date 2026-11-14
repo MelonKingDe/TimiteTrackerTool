@@ -6,7 +6,7 @@ Client-side mod for Hypixel Skyblock. Shows a permanent HUD (top-left) with:
 - the gap, and how much you need to collect per day to be #1 before 2027 (assuming the #1 stands still)
 
 Live counting: every Youngite, Timite or Obsolite you pick up (or mine) is added to your count immediately
-(+1 each). When Elite's data catches up, the live bonus is reduced accordingly. Moving items in chests or
+(+1 each). When Elite's data catches up, the live bonus is reduced accordingly. Switching worlds (e.g. entering or leaving the Rift, which has its own inventory) is ignored for 5 seconds. Moving items in chests or
 your inventory screen is not counted.
 
 ## Config / moving the HUD
@@ -19,6 +19,7 @@ Config file: `.minecraft/config/timite-tracker.json` (x, y, scale, backgroundOpa
 | `/timite scale <0.5-3>` | resize the HUD (1.0 = default) |
 | `/timite bg <0-100>` | background opacity |
 | `/timite toggle` | show / hide |
+| `/timite resetlive` | clear the live pickup bonus (+N) |
 | `/timite reload` | reload the config file after editing it |
 | `/timite reset` | back to defaults |
 

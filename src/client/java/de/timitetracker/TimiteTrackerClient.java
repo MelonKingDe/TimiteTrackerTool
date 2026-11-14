@@ -52,6 +52,10 @@ public class TimiteTrackerClient implements ClientModInitializer {
     private static volatile long localBonus = 0;
     private static volatile double lastApiAmount = -1;
     private static int invBaseline = -1;
+    /** The Rift has its own inventory: after any world change we ignore inventory changes for a few seconds. */
+    private static Object lastLevel;
+    private static int graceTicks = 0;
+    private static final int GRACE_TICKS_AFTER_WORLD_CHANGE = 100; // 5 seconds
 
     @Override
     public void onInitializeClient() {
@@ -74,7 +78,7 @@ public class TimiteTrackerClient implements ClientModInitializer {
         });
 
         ClientTickEvents.END_CLIENT_TICK.register(mc -> {
-            if (mc.player == null) { invBaseline = -1; return; }
+            if (mc.player == null) { invBaseline = -1; lastLevel = null; return; }
             trackPickups(mc);
             long now = System.currentTimeMillis();
             if (now - lastRefresh >= REFRESH_MS) {
@@ -124,6 +128,13 @@ public class TimiteTrackerClient implements ClientModInitializer {
                         ctx.getSource().sendFeedback(Component.literal("HUD background opacity: " + c.backgroundOpacity + "%"));
                         return Command.SINGLE_SUCCESS;
                     })))
+                .then(ClientCommands.literal("resetlive").executes(ctx -> {
+                    localBonus = 0;
+                    saveLocal();
+                    rebuild();
+                    ctx.getSource().sendFeedback(Component.literal("Live pickup bonus cleared"));
+                    return Command.SINGLE_SUCCESS;
+                }))
                 .then(ClientCommands.literal("reload").executes(ctx -> {
                     HudConfig.load();
                     ctx.getSource().sendFeedback(Component.literal("Timite config reloaded"));
@@ -155,6 +166,13 @@ public class TimiteTrackerClient implements ClientModInitializer {
 
     private static void trackPickups(Minecraft mc) {
         int cur = countItems(mc.player);
+        // New world (e.g. entering/leaving the Rift) -> inventory gets swapped, don't count it as pickups
+        Object level = mc.player.level();
+        if (level != lastLevel) {
+            lastLevel = level;
+            graceTicks = GRACE_TICKS_AFTER_WORLD_CHANGE;
+        }
+        if (graceTicks > 0) { graceTicks--; invBaseline = cur; return; }
         // While a chest/other container is open, items are only being moved around -> don't count
         boolean containerOpen = mc.player.containerMenu != mc.player.inventoryMenu;
         if (containerOpen || invBaseline < 0) { invBaseline = cur; return; }
