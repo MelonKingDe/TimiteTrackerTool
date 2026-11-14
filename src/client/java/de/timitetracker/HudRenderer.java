@@ -28,10 +28,10 @@ final class HudRenderer {
 
     private static Component txt(String s, ChatFormatting... f) { return Component.literal(s).withStyle(f); }
 
-    static void draw(Minecraft mc, HudConfig cfg, TimiteTrackerClient.View v, Fill g, Txt t) {
+    static void draw(Minecraft mc, HudConfig cfg, TimiteTrackerClient.View v, int ox, int oy, Fill g, Txt t) {
         final int pad = 6, hdrH = 18, rowH = mc.font.lineHeight + 3, cardH = mc.font.lineHeight * 2 + 9, gapPx = 12;
         final int rgb = cfg.accentArgb() & 0xFFFFFF;
-        final int x = cfg.x, y = cfg.y;
+        final int x = ox, y = oy;
 
         Component title = txt("TIMITE", ChatFormatting.GOLD, ChatFormatting.BOLD);
         Component sub = txt(" COLLECTION", ChatFormatting.DARK_GRAY);

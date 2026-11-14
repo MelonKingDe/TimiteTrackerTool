@@ -10,12 +10,13 @@ Live counting: every Youngite, Timite or Obsolite you pick up (or mine) is added
 your inventory screen is not counted.
 
 ## Config / moving the HUD
-Config file: `.minecraft/config/timite-tracker.json` (x, y, backgroundOpacity, visible, showProgressBar, showUpdated, accentColor).
+Config file: `.minecraft/config/timite-tracker.json` (x, y, scale, backgroundOpacity, visible, showProgressBar, showUpdated, accentColor).
 
 | Command | Effect |
 |---|---|
 | `/timite` | refresh now |
 | `/timite pos <x> <y>` | move the HUD (GUI pixels from top-left) |
+| `/timite scale <0.5-3>` | resize the HUD (1.0 = default) |
 | `/timite bg <0-100>` | background opacity |
 | `/timite toggle` | show / hide |
 | `/timite reload` | reload the config file after editing it |

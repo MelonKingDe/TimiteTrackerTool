@@ -3,6 +3,7 @@ package de.timitetracker;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.mojang.brigadier.Command;
+import com.mojang.brigadier.arguments.FloatArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
@@ -61,9 +62,15 @@ public class TimiteTrackerClient implements ClientModInitializer {
             HudConfig cfg = HudConfig.get();
             if (!cfg.visible) return;
             Minecraft mc = Minecraft.getInstance();
-            HudRenderer.draw(mc, cfg, view,
+            // Resize: translate to the HUD position, then scale everything drawn afterwards
+            var pose = graphics.pose();
+            pose.pushMatrix();
+            pose.translate((float) cfg.x, (float) cfg.y);
+            pose.scale(cfg.scale, cfg.scale);
+            HudRenderer.draw(mc, cfg, view, 0, 0,
                     (x1, y1, x2, y2, c) -> graphics.fill(x1, y1, x2, y2, c),
                     (comp, x, y, color) -> graphics.text(mc.font, comp, x, y, color));
+            pose.popMatrix();
         });
 
         ClientTickEvents.END_CLIENT_TICK.register(mc -> {
@@ -101,6 +108,14 @@ public class TimiteTrackerClient implements ClientModInitializer {
                             ctx.getSource().sendFeedback(Component.literal("HUD position set to " + c.x + ", " + c.y));
                             return Command.SINGLE_SUCCESS;
                         }))))
+                .then(ClientCommands.literal("scale")
+                    .then(ClientCommands.argument("size", FloatArgumentType.floatArg(0.5f, 3.0f)).executes(ctx -> {
+                        HudConfig c = HudConfig.get();
+                        c.scale = FloatArgumentType.getFloat(ctx, "size");
+                        HudConfig.save();
+                        ctx.getSource().sendFeedback(Component.literal("HUD scale: " + c.scale));
+                        return Command.SINGLE_SUCCESS;
+                    })))
                 .then(ClientCommands.literal("bg")
                     .then(ClientCommands.argument("opacity", IntegerArgumentType.integer(0, 100)).executes(ctx -> {
                         HudConfig c = HudConfig.get();

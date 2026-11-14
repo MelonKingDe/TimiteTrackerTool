@@ -17,6 +17,8 @@ public final class HudConfig {
     /** HUD position in GUI pixels from the top-left corner. */
     public int x = 6;
     public int y = 6;
+    /** HUD size multiplier (0.5 - 3.0). */
+    public float scale = 1.0f;
     /** Background opacity 0-100. */
     public int backgroundOpacity = 70;
     public boolean visible = true;
@@ -53,6 +55,8 @@ public final class HudConfig {
         x = Math.max(0, x);
         y = Math.max(0, y);
         backgroundOpacity = Math.max(0, Math.min(100, backgroundOpacity));
+        if (!(scale >= 0.5f)) scale = 0.5f;
+        if (scale > 3.0f) scale = 3.0f;
         if (accentColor == null) accentColor = "FFAA00";
     }
 
