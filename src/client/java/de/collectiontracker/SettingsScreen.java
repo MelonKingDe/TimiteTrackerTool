@@ -282,7 +282,7 @@ public class SettingsScreen extends Screen {
     @Override
     public void onClose() {
         commit();
-        Minecraft.getInstance().setScreen(null);
+        Minecraft.getInstance().gui.setScreen(null);
     }
 
     /** Slider with a label and a formatted value. */

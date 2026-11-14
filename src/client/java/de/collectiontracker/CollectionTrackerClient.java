@@ -80,7 +80,7 @@ public class CollectionTrackerClient implements ClientModInitializer {
         ClientTickEvents.END_CLIENT_TICK.register(mc -> {
             if (openGui || OpenKey.pressed()) {
                 openGui = false;
-                mc.setScreen(new SettingsScreen());
+                mc.gui.setScreen(new SettingsScreen());
             }
             if (mc.player == null) { invBaseline = -1; lastLevel = null; return; }
             trackPickups(mc);
